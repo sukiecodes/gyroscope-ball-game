@@ -20,35 +20,55 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.cs501gyroscopeballgame.MainActivity.Rect
 import com.example.cs501gyroscopeballgame.ui.theme.CS501GyroscopeBallGameTheme
-import kotlin.math.atan2
+import kotlin.math.max
+import kotlin.math.min
 
 class MainActivity : ComponentActivity(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var gyroscope: Sensor? = null
-    private var accelerometer: Sensor? = null
 
-    // gyroscope values xyz
+    // gyroscope values xy for side to side tilt
     private var _x by mutableStateOf(0f)
     private var _y by mutableStateOf(0f)
-    private var _z by mutableStateOf(0f)
 
-    // accelerometer data ab (only dealing with x axis and y axis)
-    private var _a by mutableStateOf(0f)
-    private var _b by mutableStateOf(0f)
+    // ball position and speed
+    private var ballX by mutableStateOf(300f)
+    private var ballY by mutableStateOf(300f)
+    private val ballRadius = 20f
+    private val speed = 3f
+
+    data class Rect(val left: Float, val top: Float, val width: Float, val height: Float)
+
+    // wall obstacles
+    private val walls = listOf(
+        Rect(50f, 50f, 200f, 50f),
+        Rect(200f, 150f, 50f, 300f),
+        Rect(400f, 200f, 50f, 100f),
+        Rect(150f, 300f, 150f, 50f),
+        Rect(350f, 400f, 50f, 200f),
+        Rect(50f, 60f, 200f, 50f),
+        Rect(100f, 70f, 50f, 150f),
+        Rect(250f, 500f, 100f, 50f),
+        Rect(700f, 200f, 50f, 100f),
+        Rect(900f, 800f, 50f, 100f),
+        Rect(680f, 450f, 100f, 300f),
+        Rect(800f, 800f, 100f, 300f),
+        Rect(1000f, 1000f, 25f, 100f)
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
         setContent {
             CS501GyroscopeBallGameTheme {
@@ -56,7 +76,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    GyroscopeGame(x = _x, y = _y, z = _z)
+                    GyroscopeGame(ballX = ballX, ballY = ballY, walls = walls)
                 }
             }
         }
@@ -80,7 +100,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             if (it.sensor.type == Sensor.TYPE_GYROSCOPE) {
                 _x = it.values[0]
                 _y = it.values[1]
-                _z = it.values[2]
+
+                ballX += _x * speed
+                ballY += _y * speed
+
+                // boundary check
+                ballX = max(ballRadius, min(ballX, 600f - ballRadius))
+                ballY = max(ballRadius, min(ballY, 400f - ballRadius))
             }
         }
     }
@@ -91,11 +117,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 }
 
 @Composable
-fun GyroscopeGame(x: Float, y: Float, z: Float) {
-    // pitch, roll, yaw values needed to know orientation angles calculated using math!
-    val pitch = atan2(z, -y) * 180 / Math.PI
-    val roll = atan2(x, -y) * 180 / Math.PI
-    val yaw = atan2(-x, -z) * 180 / Math.PI
+fun GyroscopeGame(ballX: Float, ballY: Float, walls: List<Rect>) {
 
     Column(
         modifier = Modifier
@@ -104,24 +126,38 @@ fun GyroscopeGame(x: Float, y: Float, z: Float) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Canvas(
-            // circle that rotates 3D based on the pitch, roll, yaw values that were calculated using gyroscope
-            modifier = Modifier.graphicsLayer {
-                this.transformOrigin = TransformOrigin(0f, 0f)
-                this.rotationX = pitch.toFloat()
-                this.rotationY = roll.toFloat()
-                this.rotationZ = yaw.toFloat()
+        // drawing the walls and the ball for game
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            walls.forEach {
+                drawRect(
+                    color = Color.Gray,
+                    topLeft = Offset(x = it.left, y = it.top),
+                    size = Size(height = it.height, width = it.width)
+                )
             }
-        ) {
-            drawCircle(color = Color.Blue, radius = 200f)
+            drawCircle(
+                color = Color.Blue,
+                radius = 20f,
+                center = Offset(ballX, ballY) // change the position of the ball on screen coordinates
+            )
         }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
+fun GyroscopeGamePreview() {
     CS501GyroscopeBallGameTheme {
-        GyroscopeGame(x = 0f, y = 0f, z = 0f)
+        GyroscopeGame(ballX = 300f, ballY = 300f, listOf(
+            Rect(50f, 50f, 200f, 50f),
+            Rect(200f, 150f, 50f, 300f),
+            Rect(400f, 200f, 50f, 100f),
+            Rect(150f, 300f, 150f, 50f),
+            Rect(350f, 400f, 50f, 200f),
+            Rect(50f, 60f, 200f, 50f),
+            Rect(100f, 70f, 50f, 150f),
+            Rect(250f, 50f, 100f, 50f),
+            Rect(100f, 200f, 50f, 100f)
+        ))
     }
 }
